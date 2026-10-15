@@ -1234,22 +1234,26 @@ static tjhandle _tjInitCompress(tjinstance *this)
   this->jerr.tjHandle = (tjhandle)this;
 
   if (setjmp(this->jerr.setjmp_buffer)) {
-    /* If we get here, the JPEG code has signaled an error. */
-    free(this);
+    /* If we get here, the JPEG code has signaled an error.  Destroy the
+       instance so that partially-initialized state is not leaked. */
+    tj3Destroy((tjhandle)this);
     retval = NULL;  goto bailout;
   }
 
+  /* Set before jpeg_create_compress() so that tj3Destroy() can release any
+     state created before a possible error exit. */
+  this->init |= COMPRESS;
   jpeg_create_compress(&this->cinfo);
   /* Make an initial call so it will create the destination manager */
   jpeg_mem_dest_tj(&this->cinfo, &buf, &size, 0);
   this->dstMgrs = (struct jpeg_destination_mgr **)
     malloc(sizeof(struct jpeg_destination_mgr *));
-  if (!this->dstMgrs)
+  if (!this->dstMgrs) {
+    tj3Destroy((tjhandle)this);
     THROWG("Memory allocation failure", NULL);
+  }
   this->dstMgrs[0] = this->cinfo.dest;
   this->nDstMgrs = 1;
-
-  this->init |= COMPRESS;
 
 bailout:
   return retval;
@@ -1891,16 +1895,19 @@ static tjhandle _tjInitDecompress(tjinstance *this)
   this->jerr.tjHandle = (tjhandle)this;
 
   if (setjmp(this->jerr.setjmp_buffer)) {
-    /* If we get here, the JPEG code has signaled an error. */
-    free(this);
+    /* If we get here, the JPEG code has signaled an error.  Destroy the
+       instance so that partially-initialized state is not leaked. */
+    tj3Destroy((tjhandle)this);
     return NULL;
   }
 
+  /* Set before jpeg_create_decompress() so that tj3Destroy() can release
+     any state created before a possible error exit. */
+  this->init |= DECOMPRESS;
   jpeg_create_decompress(&this->dinfo);
   /* Make an initial call so it will create the source manager */
   jpeg_mem_src_tj(&this->dinfo, buffer, 1);
 
-  this->init |= DECOMPRESS;
   return (tjhandle)this;
 }
 

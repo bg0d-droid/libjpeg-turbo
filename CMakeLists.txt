@@ -879,6 +879,14 @@ if(WITH_TURBOJPEG)
       add_executable(tjunittest-static src/tjunittest.c src/tjutil.c
         src/md5/md5.c src/md5/md5hl.c)
       target_link_libraries(tjunittest-static turbojpeg-static)
+
+      if(NOT WIN32)
+        # oomtest replaces malloc() and friends and thus relies on
+        # link-time interposition, which is why it is linked with the
+        # static library and not built for Windows.
+        add_executable(oomtest-static src/oomtest.c)
+        target_link_libraries(oomtest-static turbojpeg-static)
+      endif()
     endif()
 
     if(WITH_TOOLS)
@@ -1222,6 +1230,9 @@ foreach(libtype ${TEST_LIBTYPES})
       COMMAND tjunittest${suffix} -lossless -alloc)
     add_test(NAME tjunittest-${libtype}-bmp
       COMMAND tjunittest${suffix} -bmp)
+    if(libtype STREQUAL "static" AND NOT WIN32)
+      add_test(NAME oomtest COMMAND oomtest-static)
+    endif()
     add_test(NAME tjunittest12-${libtype}
       COMMAND tjunittest${suffix} -precision 12)
     add_test(NAME tjunittest12-${libtype}-alloc
